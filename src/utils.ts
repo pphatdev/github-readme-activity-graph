@@ -1,3 +1,4 @@
+import moment from 'moment';
 import { Response } from 'express';
 import { Card } from './GraphCards';
 import { invalidUserSvg } from './svgs';
@@ -38,6 +39,49 @@ export class Utilities {
         };
     }
 
+    private validateDays(days?: string): number {
+        const d = Number(days);
+        if (typeof d !== 'number') {
+            return 31;
+        } else if (d > 0 && d <= 90) {
+            return d;
+        } else {
+            return 31;
+        }
+    }
+
+    private validateDate(date?: string): boolean {
+        const format = 'YYYY-MM-DD';
+        return moment(date, format, true).isValid();
+    }
+
+    private stringDateToUTC(date?: string): string {
+        const format = 'YYYY-MM-DD';
+        return moment(date, format, true).utc().toISOString();
+    }
+
+    private validateFromIsLessThanTwo(from: string, to: string): boolean {
+        // Parse the ISO string dates into Moment objects
+        const fromDate = moment(from);
+        const toDate = moment(to);
+        const now = moment();
+        // Compare the dates using the isBefore method
+        return (
+            fromDate.isBefore(toDate) &&
+            moment(fromDate).isSameOrBefore(now) &&
+            moment(toDate).isSameOrBefore(now)
+        );
+    }
+
+    private calculateNumberOfDaysFromDate(from: string, to: string): number {
+        // Parse the ISO string dates into Moment objects
+        const fromDate = moment(from);
+        const toDate = moment(to);
+
+        // Compare the dates using the isBefore method
+        return toDate.diff(fromDate, 'days');
+    }
+
     public queryOptions() {
         let area = false;
         if (String(this.queryString.area) === 'true') {
@@ -46,6 +90,22 @@ export class Utilities {
 
         // Custom options for user
         const colors = this.getColors();
+        let from = '',
+            to = '',
+            days = 31;
+        const isFromValid = this.validateDate(this.queryString.from);
+        const isToValid = this.validateDate(this.queryString.to);
+        if (isFromValid && isToValid) {
+            from = this.stringDateToUTC(this.queryString.from);
+            to = this.stringDateToUTC(this.queryString.to);
+            if (!this.validateFromIsLessThanTwo(from, to)) {
+                from = '';
+                to = '';
+                days = 31;
+            } else {
+                days = this.calculateNumberOfDaysFromDate(from, to);
+            }
+        }
 
         const options: QueryOption = {
             username: this.username,
@@ -55,9 +115,13 @@ export class Utilities {
                 : 0, // Border radius in range [0, 16]
             colors: colors,
             area: area,
-            height: this.queryString.height 
+            height: this.queryString.height
                 ? Math.min(Math.max(this.queryString.height, 200), 600)
                 : 420, // Custom height implementation from range [200, 600], if not specified use default value - 420
+            days: isFromValid && isToValid ? days : this.validateDays(this.queryString.days),
+            grid: this.queryString.grid === 'false' ? false : true,
+            from,
+            to,
         };
 
         if (this.queryString.custom_title)
@@ -81,7 +145,15 @@ export class Utilities {
                 }
             }
 
-            const graph = new Card(options.height, 1200, options.radius, options.colors, title, options.area);
+            const graph = new Card(
+                options.height,
+                1200,
+                options.radius,
+                options.colors,
+                title,
+                options.area,
+                options.grid
+            );
             const getChart = await graph.buildGraph(fetchCalendarData.contributions);
             return {
                 finalGraph: getChart,

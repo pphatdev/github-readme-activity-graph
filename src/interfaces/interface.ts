@@ -19,10 +19,14 @@ export class QueryOption {
     username: string;
     hide_title?: boolean;
     custom_title?: string;
+    from?: string;
+    to?: string;
+    grid: boolean;
     colors: Colors;
     area: boolean;
     radius: number;
     height: number;
+    days: number;
 }
 
 export class ParsedQs {
@@ -40,6 +44,10 @@ export class ParsedQs {
     radius?: number;
     title_color?: string;
     height?: number;
+    days?: string;
+    from?: string;
+    to?: string;
+    grid?: string;
 }
 
 export class GraphArgs {

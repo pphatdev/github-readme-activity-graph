@@ -46,11 +46,22 @@ export class Fetcher {
         });
     }
 
-    public async fetchContributions(): Promise<UserDetails | string> {
-        const now = moment();
-        const from = moment(now).subtract(30, 'days').utc().toISOString();
-        // also include the next day in case our server is behind in time with respect to GitHub
-        const to = moment(now).add(1, 'days').utc().toISOString();
+    public async fetchContributions(
+        days: number,
+        customFromDate?: string,
+        customToDate?: string
+    ): Promise<UserDetails | string> {
+        let from = '',
+            to = '';
+        if (customFromDate && customToDate) {
+            from = moment(customFromDate).utc().toISOString(true);
+            to = moment(customToDate).utc().toISOString(true);
+        } else {
+            const now = moment();
+            from = moment(now).subtract(days, 'days').utc().toISOString();
+            // also include the next day in case our server is behind in time with respect to GitHub
+            to = moment(now).add(1, 'days').utc().toISOString();
+        }
 
         try {
             const apiResponse = await this.fetch(this.getGraphQLQuery(from, to));
@@ -78,12 +89,13 @@ export class Fetcher {
                 // either the day hasn't really started
                 // or the user hasn't contributed today
                 const length = userData.contributions.length;
-
-                if (userData.contributions[length - 1].contributionCount === 0) {
-                    userData.contributions.pop();
+                if (!(customFromDate && customToDate)) {
+                    if (userData.contributions[length - 1].contributionCount === 0) {
+                        userData.contributions.pop();
+                    }
+                    const extra = userData.contributions.length - days;
+                    userData.contributions.splice(0, extra);
                 }
-                const extra = userData.contributions.length - 31;
-                userData.contributions.splice(0, extra);
                 return userData;
             }
         } catch (error) {
